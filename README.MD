@@ -62,3 +62,17 @@ if __name__ == "__main__":
         executor.map(upload_to_gcs, filter(None, file_paths))
 
     print("✅ All files processed and uploaded.")
+
+## 2. BigQuery Setup
+
+Run the following SQL queries in the BigQuery Console to prepare your environment.
+
+### 1. Create External Table
+Creates a definition pointing to the files in GCS (no data movement).
+
+```sql
+CREATE OR REPLACE EXTERNAL TABLE `de-zoomcamp-hw3-486917.ny_taxi.external_yellow_tripdata`
+OPTIONS (
+  format = 'PARQUET',
+  uris = ['gs://yellow-taxi-2024-joy-hw3/yellow_tripdata_2024-*.parquet']
+);
