@@ -62,6 +62,7 @@ if __name__ == "__main__":
         executor.map(upload_to_gcs, filter(None, file_paths))
 
     print("✅ All files processed and uploaded.")
+```
 
 ## 2. BigQuery Setup
 
@@ -76,3 +77,88 @@ OPTIONS (
   format = 'PARQUET',
   uris = ['gs://yellow-taxi-2024-joy-hw3/yellow_tripdata_2024-*.parquet']
 );
+
+```
+
+### 2. Create Materialized Table
+Creates a standard, non-partitioned table in BigQuery storage.
+
+```sql
+CREATE OR REPLACE TABLE `de-zoomcamp-hw3-486917.ny_taxi.yellow_tripdata_non_partitioned` AS
+SELECT * FROM `de-zoomcamp-hw3-486917.ny_taxi.external_yellow_tripdata`;
+```
+
+## 3. Homework Questions & Answers
+
+### Question 1: What is count of records for the 2024 Yellow Taxi Data?
+**Answer:** 20,332,093
+
+**Query:**
+```sql
+SELECT COUNT(*) FROM `de-zoomcamp-hw3-486917.ny_taxi.yellow_tripdata_non_partitioned`;
+```
+
+### Question 2: Estimated amount of data read (External vs. Materialized)
+**Answer:** 0 MB for the External Table and 155.12 MB for the Materialized Table
+
+**External Table:** BigQuery cannot estimate the size for external Parquet files (shows 0 MB).
+
+**Materialized Table:** BigQuery knows the exact size of the PULocationID column (~155 MB).
+
+**Query for External Table:**
+```sql
+SELECT COUNT(DISTINCT PULocationID) FROM `de-zoomcamp-hw3-486917.ny_taxi.external_yellow_tripdata`;
+```
+
+**Query for Materialized Table:**
+```sql
+SELECT COUNT(DISTINCT PULocationID) FROM `de-zoomcamp-hw3-486917.ny_taxi.yellow_tripdata_non_partitioned`;
+```
+
+### Question 3: Why are the estimated number of Bytes different?
+**Answer:** BigQuery is a columnar database, and it only scans the specific columns requested in the query. Querying two columns (PULocationID, DOLocationID) requires reading more data than querying one column (PULocationID), leading to a higher estimated number of bytes processed.
+
+### Question 4: How many records have a fare_amount of 0?
+**Answer:** 8,333
+
+**Query:**
+```sql
+SELECT COUNT(*) FROM `de-zoomcamp-hw3-486917.ny_taxi.yellow_tripdata_non_partitioned`
+WHERE fare_amount = 0;
+```
+
+### Question 5: Best strategy for optimized table
+**Scenario:** Query always filters by tpep_dropoff_datetime and orders by VendorID.
+
+**Answer:** Partition by tpep_dropoff_datetime and Cluster on VendorID
+
+**SQL to create this table:**
+```sql
+CREATE OR REPLACE TABLE `de-zoomcamp-hw3-486917.ny_taxi.yellow_tripdata_partitioned_clustered`
+PARTITION BY DATE(tpep_dropoff_datetime)
+CLUSTER BY VendorID AS
+SELECT * FROM `de-zoomcamp-hw3-486917.ny_taxi.external_yellow_tripdata`;
+```
+
+### Question 6: Estimated bytes for distinct VendorID (March 1-15, 2024)
+**Answer:** 310.24 MB for non-partitioned table and 26.84 MB for the partitioned table
+
+**Query (Non-Partitioned):**
+```sql
+SELECT DISTINCT VendorID
+FROM `de-zoomcamp-hw3-486917.ny_taxi.yellow_tripdata_non_partitioned`
+WHERE tpep_dropoff_datetime >= '2024-03-01' AND tpep_dropoff_datetime <= '2024-03-15';
+```
+
+**Query (Partitioned):**
+```sql
+SELECT DISTINCT VendorID
+FROM `de-zoomcamp-hw3-486917.ny_taxi.yellow_tripdata_partitioned_clustered`
+WHERE tpep_dropoff_datetime >= '2024-03-01' AND tpep_dropoff_datetime <= '2024-03-15';
+```
+
+### Question 7: Where is the data stored in the External Table?
+**Answer:** GCP Bucket (External tables store metadata in BigQuery, but the actual data remains in Google Cloud Storage).
+
+### Question 8: Always create partitioned tables from External Tables?
+**Answer:** False (It is often more efficient to perform heavy transformations on data already inside BigQuery, or to use a staging table first).
